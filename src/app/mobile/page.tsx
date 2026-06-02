@@ -208,7 +208,7 @@ export default function PhoneApp() {
           {!fullscreen && <div className="island" />}
           <div className="device-screen phone-app">
             {!d.isLoaded && (
-              <div style={{ position: 'absolute', top: 54, left: 0, right: 0, height: 3, zIndex: 100, background: 'var(--bg-2)' }}>
+              <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 3, zIndex: 100, background: 'var(--bg-2)' }}>
                 <div className="skeleton" style={{ width: '100%', height: '100%' }}></div>
               </div>
             )}
@@ -235,9 +235,6 @@ export default function PhoneApp() {
                   {React.cloneElement(screens[tab], { key: tab })}
                   <div style={{ height: 8 }} />
                   <button onClick={d.reset} className="mono" style={{ width: "100%", marginTop: 12, padding: "11px", background: "transparent", border: "1.5px dashed var(--line-strong)", borderRadius: 12, color: "var(--ink-mute)", cursor: "pointer", fontSize: 10, letterSpacing: "0.14em", textTransform: "uppercase" }}>↺ Reset all data to defaults</button>
-                  <div style={{ textAlign: "center", marginTop: 10 }}>
-                    <a href="/" className="mono" style={{ fontSize: 9.5, letterSpacing: "0.14em", textTransform: "uppercase", color: "var(--ink-mute)", textDecoration: "none" }}>🖥 Open desktop dashboard →</a>
-                  </div>
                 </>
               )}
             </div>

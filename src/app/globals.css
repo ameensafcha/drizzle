@@ -574,23 +574,6 @@ body[data-theme="light"] .app-stage {
 .app-fullscreen .device .island { display: none; }
 
 /* App chrome */
-.app-statusbar {
-  flex-shrink: 0;
-  height: 54px;
-  display: flex;
-  align-items: flex-end;
-  justify-content: space-between;
-  padding: 0 28px 6px;
-  font-family: var(--font-mono);
-  font-size: 14px;
-  font-weight: 600;
-  color: var(--ink);
-  position: relative;
-  z-index: 70;
-}
-.app-fullscreen .app-statusbar { height: env(safe-area-inset-top, 44px); min-height: 44px; padding-top: 8px; align-items: center; }
-.app-statusbar .sb-icons { display: flex; gap: 6px; align-items: center; }
-
 .app-header {
   flex-shrink: 0;
   padding: 8px 18px 12px;
