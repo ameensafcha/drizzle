@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect, useReducer, useRef } from 'react';
-import { getAllStore, getStore, syncBatch } from '@/app/actions';
+import { getAllStore, getStore, syncBatch, patchStore } from '@/app/actions';
 import { toast } from '@/components/Common';
 import { useRealtime } from './useRealtime';
 
@@ -205,12 +205,16 @@ export function useDashboardState() {
     }
   };
 
-  // Realtime — single wildcard handles all keys
-  useRealtime('*', (updatedKey) => {
+  // Realtime — single wildcard handles all keys (data comes in SSE payload)
+  useRealtime('*', (updatedKey, value) => {
     if (syncing.current) return;
-    getStore(updatedKey).then(stored => {
-      if (stored !== null) dispatch({ type: 'SET', key: updatedKey, value: stored });
-    });
+    if (value !== undefined) {
+      dispatch({ type: 'SET', key: updatedKey, value });
+    } else {
+      getStore(updatedKey).then(stored => {
+        if (stored !== null) dispatch({ type: 'SET', key: updatedKey, value: stored });
+      });
+    }
   });
 
   // Flush on unmount

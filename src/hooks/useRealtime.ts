@@ -2,7 +2,7 @@
 
 import { useEffect, useRef } from 'react';
 
-type RealtimeHandler = (key: string) => void;
+type RealtimeHandler = (key: string, value?: any) => void;
 
 const handlers = new Map<string, Set<RealtimeHandler>>();
 let es: EventSource | null = null;
@@ -15,11 +15,20 @@ function startSSE() {
   es = new EventSource(`${window.location.origin}/api/realtime`);
 
   es.addEventListener('update', (e: MessageEvent) => {
-    const key = e.data;
+    const raw = String(e.data);
+    const colonIdx = raw.indexOf(':');
+    let key = raw;
+    let value: any = undefined;
+
+    if (colonIdx > 0) {
+      key = raw.slice(0, colonIdx);
+      try { value = JSON.parse(raw.slice(colonIdx + 1)); } catch { /* use raw text */ }
+    }
+
     const set = handlers.get(key);
-    if (set) set.forEach(fn => fn(key));
+    if (set) set.forEach(fn => fn(key, value));
     const wild = handlers.get('*');
-    if (wild) wild.forEach(fn => fn(key));
+    if (wild) wild.forEach(fn => fn(key, value));
   });
 
   es.onerror = () => {
@@ -32,7 +41,6 @@ function stopSSE() {
   if (es) { es.close(); es = null; }
 }
 
-// Visibility change — pause when hidden, resume when visible
 if (typeof window !== 'undefined') {
   document.addEventListener('visibilitychange', () => {
     if (document.hidden) { stopSSE(); }
@@ -48,7 +56,7 @@ export function useRealtime(key: string, handler: RealtimeHandler) {
     startSSE();
     if (!handlers.has(key)) handlers.set(key, new Set());
 
-    const wrapper: RealtimeHandler = (k) => handlerRef.current(k);
+    const wrapper: RealtimeHandler = (k, v) => handlerRef.current(k, v);
     handlers.get(key)!.add(wrapper);
 
     return () => {

@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState, useRef } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Card, NumInput, AnimatedNumber, fmtSAR, fmtInt, HoneyDrip, Stat } from './Common';
 
 // ---- Cost editor (ingredients / packaging) ----
@@ -282,13 +282,14 @@ export function BreakEven({ fixedCosts, setFixedCosts, retailPrice, ingredients,
 // ---- Monthly Projection ----
 export function MonthlyProjection({ units: initialUnits, setUnits: onCommitUnits, retailPrice, ingredients, packaging, variable, absorbShipping, fixedCosts }: any) {
   const [localUnits, setLocalUnits] = useState(initialUnits);
+  const [isDragging, setIsDragging] = useState(false);
+  // Focus guard — remote updates won't hijack while dragging
+  useEffect(() => {
+    if (!isDragging) setLocalUnits(initialUnits);
+  }, [initialUnits, isDragging]);
   const units = localUnits;
-  const setUnits = (v: number) => {
-    setLocalUnits(v);
-  };
-  const commitUnits = () => {
-    if (localUnits !== initialUnits) onCommitUnits(localUnits);
-  };
+  const setUnits = (v: number) => { setLocalUnits(v); };
+  const commitUnits = () => { setIsDragging(false); if (localUnits !== initialUnits) onCommitUnits(localUnits); };
 
   const ingTotal = ingredients.reduce((s: number, r: any) => s + (parseFloat(r.val) || 0), 0);
   const pkgTotal = packaging.reduce((s: number, r: any) => s + (parseFloat(r.val) || 0), 0);
@@ -339,6 +340,7 @@ export function MonthlyProjection({ units: initialUnits, setUnits: onCommitUnits
           min={10} max={500} step={5}
           value={units}
           onChange={(e) => setUnits(parseInt(e.target.value, 10))}
+          onMouseDown={() => setIsDragging(true)}
           onMouseUp={commitUnits}
           onTouchEnd={commitUnits}
           onBlur={commitUnits}

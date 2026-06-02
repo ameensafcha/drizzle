@@ -38,8 +38,11 @@ export async function syncBatch(pairs: { key: string; value: any }[]) {
           set: { value, updatedAt: new Date() },
         });
     }
-    for (const { key } of pairs) {
-      try { await sql`SELECT pg_notify('ds_update', ${key})`; } catch { /* ignore */ }
+    for (const { key, value } of pairs) {
+      try {
+        const payload = key + ':' + JSON.stringify(value);
+        await sql`SELECT pg_notify('ds_update', ${payload})`;
+      } catch { /* ignore */ }
     }
     return { success: true };
   } catch (error) {
@@ -56,10 +59,31 @@ export async function setStore(key: string, value: any) {
         target: dashboardState.key,
         set: { value, updatedAt: new Date() },
       });
-    try { await sql`SELECT pg_notify('ds_update', ${key})`; } catch { /* notify non-critical */ }
+    const payload = key + ':' + JSON.stringify(value);
+    try { await sql`SELECT pg_notify('ds_update', ${payload})`; } catch { /* notify non-critical */ }
     return { success: true };
   } catch (error) {
     console.error(`Error setting store for key ${key}:`, error);
+    return { success: false, error };
+  }
+}
+
+// Delta update — only updates a specific JSON path within a key
+export async function patchStore(key: string, path: string[], value: any) {
+  try {
+    const jsonValue = JSON.stringify(value);
+    await sql`
+      UPDATE dashboard_state
+      SET value = jsonb_set(COALESCE(value, '{}'::jsonb), ${path}::text[], ${jsonValue}::jsonb, true),
+          updated_at = now()
+      WHERE key = ${key}
+    `;
+    // Send the full key for re-fetch (client gets the specific path from the event)
+    const payload = key + ':' + jsonValue;
+    try { await sql`SELECT pg_notify('ds_update', ${payload})`; } catch { /* ignore */ }
+    return { success: true };
+  } catch (error) {
+    console.error(`Error patching store for ${key}:`, error);
     return { success: false, error };
   }
 }
