@@ -51,16 +51,6 @@ const TABS = [
   { key: "contacts", label: "Contacts", icon: TabIcons.contacts },
 ];
 
-function StatusClock() {
-  const [now, setNow] = useState(new Date());
-  useEffect(() => {
-    const id = setInterval(() => setNow(new Date()), 30000);
-    return () => clearInterval(id);
-  }, []);
-  const t = now.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", hour12: false });
-  return <span>{t}</span>;
-}
-
 function MiniKPI({ label, value, unit, tone }: any) {
   const colorMap: any = { honey: "var(--honey)", green: "var(--green)", yellow: "var(--yellow)", red: "var(--red)", default: "var(--cream)" };
   const color = colorMap[tone] || colorMap.default;
@@ -222,14 +212,6 @@ export default function PhoneApp() {
                 <div className="skeleton" style={{ width: '100%', height: '100%' }}></div>
               </div>
             )}
-            <div className="app-statusbar">
-              <StatusClock />
-              <div className="sb-icons">
-                <svg width="17" height="11" viewBox="0 0 19 12"><rect x="0" y="7.5" width="3.2" height="4.5" rx="0.7" fill="currentColor"/><rect x="4.8" y="5" width="3.2" height="7" rx="0.7" fill="currentColor"/><rect x="9.6" y="2.5" width="3.2" height="9.5" rx="0.7" fill="currentColor"/><rect x="14.4" y="0" width="3.2" height="12" rx="0.7" fill="currentColor"/></svg>
-                <svg width="24" height="11" viewBox="0 0 27 13"><rect x="0.5" y="0.5" width="23" height="12" rx="3.5" stroke="currentColor" strokeOpacity="0.4" fill="none"/><rect x="2" y="2" width="18" height="9" rx="2" fill="currentColor"/><path d="M25 4.5V8.5C25.8 8.2 26.5 7.2 26.5 6.5C26.5 5.8 25.8 4.8 25 4.5Z" fill="currentColor" fillOpacity="0.4"/></svg>
-              </div>
-            </div>
-
             <div className="app-header">
               <div>
                 <div className="wordmark">DRIZZLE <span className="amp">&amp; SAUCE</span></div>
