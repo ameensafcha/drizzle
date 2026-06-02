@@ -4,6 +4,18 @@ import { db, sql } from '@/db';
 import { dashboardState } from '@/db/schema';
 import { eq } from 'drizzle-orm';
 
+export async function getAllStore() {
+  try {
+    const result = await db.query.dashboardState.findMany();
+    const map: Record<string, any> = {};
+    for (const row of result) map[row.key] = row.value;
+    return map;
+  } catch (error) {
+    console.error('Error getting all store:', error);
+    return {};
+  }
+}
+
 export async function getStore(key: string) {
   try {
     const result = await db.query.dashboardState.findFirst({
