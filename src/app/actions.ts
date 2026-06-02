@@ -1,6 +1,6 @@
 'use server'
 
-import { db } from '@/db';
+import { db, sql } from '@/db';
 import { dashboardState } from '@/db/schema';
 import { eq } from 'drizzle-orm';
 
@@ -24,6 +24,7 @@ export async function setStore(key: string, value: any) {
         target: dashboardState.key,
         set: { value, updatedAt: new Date() },
       });
+    try { await sql`SELECT pg_notify('ds_update', ${key})`; } catch { /* notify non-critical */ }
     return { success: true };
   } catch (error) {
     console.error(`Error setting store for key ${key}:`, error);

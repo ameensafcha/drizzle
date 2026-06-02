@@ -1,12 +1,14 @@
 import { useState, useEffect, useRef } from 'react';
 import { getStore, setStore } from '@/app/actions';
 import { toast } from '@/components/Common';
+import { useRealtime } from './useRealtime';
 
 export function usePersistentState<T>(key: string, defaultValue: T): [T, (val: T) => void, boolean] {
   const [value, setValue] = useState<T>(defaultValue);
   const [loaded, setLoaded] = useState(false);
   const isSetting = useRef(false);
   const initialSync = useRef(true);
+  const fromRealtime = useRef(false);
 
   // Initial Fetch
   useEffect(() => {
@@ -37,6 +39,9 @@ export function usePersistentState<T>(key: string, defaultValue: T): [T, (val: T
   useEffect(() => {
     if (!loaded) return;
 
+    // Realtime aaya to skip — saving overlay + redundant DB write nahi
+    if (fromRealtime.current) { fromRealtime.current = false; return; }
+
     isSetting.current = true;
     const timeout = setTimeout(async () => {
       const isInit = initialSync.current;
@@ -53,6 +58,20 @@ export function usePersistentState<T>(key: string, defaultValue: T): [T, (val: T
       isSetting.current = false;
     };
   }, [key, value, loaded]);
+
+  // Realtime — re-fetch when another tab/device updates this key
+  useRealtime(key, (updatedKey) => {
+    if (updatedKey !== key) return;
+    if (isSetting.current) return;
+    fromRealtime.current = true;
+    getStore(key).then((stored) => {
+      if (stored !== null && JSON.stringify(stored) !== JSON.stringify(value)) {
+        setValue(stored as T);
+      } else {
+        fromRealtime.current = false;
+      }
+    });
+  });
 
   return [value, setValue, loaded];
 }
