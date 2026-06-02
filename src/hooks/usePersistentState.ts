@@ -42,14 +42,18 @@ export function usePersistentState<T>(key: string, defaultValue: T): [T, (val: T
     // Realtime aaya to skip — saving overlay + redundant DB write nahi
     if (fromRealtime.current) { fromRealtime.current = false; return; }
 
+    const isInit = initialSync.current;
+    initialSync.current = false;
+
+    // Initial sync skip — data already in DB, redundant write nahi
+    if (isInit) { isSetting.current = false; return; }
+
     isSetting.current = true;
     const timeout = setTimeout(async () => {
-      const isInit = initialSync.current;
-      initialSync.current = false;
-      if (!isInit) window.dispatchEvent(new CustomEvent('ds-saving', { detail: true }));
+      window.dispatchEvent(new CustomEvent('ds-saving', { detail: true }));
       const res = await setStore(key, value);
-      if (!isInit) window.dispatchEvent(new CustomEvent('ds-saving', { detail: false }));
-      if (!isInit && res.success) toast('✦ saved');
+      window.dispatchEvent(new CustomEvent('ds-saving', { detail: false }));
+      if (res.success) toast('✦ saved');
       isSetting.current = false;
     }, 800);
 
