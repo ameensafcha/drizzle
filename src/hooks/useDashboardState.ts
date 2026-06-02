@@ -1,5 +1,17 @@
-import { useState, useMemo, useEffect } from 'react';
-import { usePersistentState } from './usePersistentState';
+import { useState, useMemo, useEffect, useReducer, useRef } from 'react';
+import { getAllStore, getStore, setStore } from '@/app/actions';
+import { toast } from '@/components/Common';
+import { useRealtime } from './useRealtime';
+
+type Action = { type: 'INIT'; payload: Record<string, any> } | { type: 'SET'; key: string; value: any };
+
+function reducer(state: Record<string, any>, action: Action) {
+  switch (action.type) {
+    case 'INIT': return { ...state, ...action.payload };
+    case 'SET':  return { ...state, [action.key]: action.value };
+    default:     return state;
+  }
+}
 
 export const DEFAULT_INGREDIENTS = [
   { name: "Honey (300g)",           val: 0, note: "~80% of ingredient cost" },
@@ -133,27 +145,85 @@ export const DEFAULT_CONTACTS = {
 };
 
 export function useDashboardState() {
-  const [tagline,        setTagline,        l1] = usePersistentState("tagline", "Hot honey, reimagined.");
-  const [stage,          setStage,          l2] = usePersistentState("stage", "Pre-launch");
-  const [ingredients,    setIngredients,    l3] = usePersistentState("ingredients", DEFAULT_INGREDIENTS);
-  const [packaging,      setPackaging,      l4] = usePersistentState("packaging", DEFAULT_PACKAGING);
-  const [variable,       setVariable,       l5] = usePersistentState("variable", DEFAULT_VARIABLE);
-  const [retailPrice,    setRetailPrice,    l6] = usePersistentState("retailPrice", 0);
-  const [absorbShipping, setAbsorbShipping, l7] = usePersistentState("absorbShipping", false);
-  const [fixedCosts,     setFixedCosts,     l8] = usePersistentState("fixedCosts", 0);
-  const [unitsPerMonth,  setUnitsPerMonth,  l9] = usePersistentState("unitsPerMonth", 0);
-  const [milestones,     setMilestones,     l10] = usePersistentState("milestones", DEFAULT_MILESTONES);
-  const [formulation,    setFormulation,    l11] = usePersistentState("formulation", DEFAULT_FORMULATION);
-  const [designFiles,    setDesignFiles,    l12] = usePersistentState("designFiles", DEFAULT_DESIGN_FILES);
-  const [social,         setSocial,         l13] = usePersistentState("social", DEFAULT_SOCIAL);
-  const [sauces,         setSauces,         l14] = usePersistentState("sauces", DEFAULT_SAUCES);
-  const [contacts,       setContacts,       l15] = usePersistentState("contacts", DEFAULT_CONTACTS);
+  const ALL_DEFAULTS: Record<string, any> = {
+    tagline: "Hot honey, reimagined.",
+    stage: "Pre-launch",
+    ingredients: DEFAULT_INGREDIENTS,
+    packaging: DEFAULT_PACKAGING,
+    variable: DEFAULT_VARIABLE,
+    retailPrice: 0,
+    absorbShipping: false,
+    fixedCosts: 0,
+    unitsPerMonth: 0,
+    milestones: DEFAULT_MILESTONES,
+    formulation: DEFAULT_FORMULATION,
+    designFiles: DEFAULT_DESIGN_FILES,
+    social: DEFAULT_SOCIAL,
+    sauces: DEFAULT_SAUCES,
+    contacts: DEFAULT_CONTACTS,
+  };
+
+  const [state, dispatch] = useReducer(reducer, ALL_DEFAULTS);
+  const [loaded, setLoaded] = useState(false);
+  const timers = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
+
+  // Single batch fetch — 1 request replaces 15
+  useEffect(() => {
+    getAllStore().then(data => {
+      if (data && Object.keys(data).length > 0) {
+        dispatch({ type: 'INIT', payload: data });
+      }
+      setLoaded(true);
+    });
+  }, []);
+
+  // Per-key debounced sync
+  const setter = (key: string, value: any) => {
+    dispatch({ type: 'SET', key, value });
+    if (timers.current[key]) clearTimeout(timers.current[key]);
+    timers.current[key] = setTimeout(async () => {
+      window.dispatchEvent(new CustomEvent('ds-saving', { detail: true }));
+      const res = await setStore(key, value);
+      window.dispatchEvent(new CustomEvent('ds-saving', { detail: false }));
+      if (res.success) toast('✦ saved');
+    }, 800);
+  };
+
+  // Realtime — single wildcard handles all keys
+  useRealtime('*', (updatedKey) => {
+    getStore(updatedKey).then(stored => {
+      if (stored !== null) dispatch({ type: 'SET', key: updatedKey, value: stored });
+    });
+  });
+
+  // Cleanup timers
+  useEffect(() => {
+    return () => { for (const k in timers.current) clearTimeout(timers.current[k]); };
+  }, []);
+
+  // Individual setters (same API as before)
+  const setTagline = (v: any) => setter("tagline", v);
+  const setStage = (v: any) => setter("stage", v);
+  const setIngredients = (v: any) => setter("ingredients", v);
+  const setPackaging = (v: any) => setter("packaging", v);
+  const setVariable = (v: any) => setter("variable", v);
+  const setRetailPrice = (v: any) => setter("retailPrice", v);
+  const setAbsorbShipping = (v: any) => setter("absorbShipping", v);
+  const setFixedCosts = (v: any) => setter("fixedCosts", v);
+  const setUnitsPerMonth = (v: any) => setter("unitsPerMonth", v);
+  const setMilestones = (v: any) => setter("milestones", v);
+  const setFormulation = (v: any) => setter("formulation", v);
+  const setDesignFiles = (v: any) => setter("designFiles", v);
+  const setSocial = (v: any) => setter("social", v);
+  const setSauces = (v: any) => setter("sauces", v);
+  const setContacts = (v: any) => setter("contacts", v);
+
   const [theme, setTheme] = useState(() => {
     if (typeof window === 'undefined') return 'dark';
     return localStorage.getItem('ds.theme') || 'dark';
   });
 
-  const isLoaded = l1 && l2 && l3 && l4 && l5 && l6 && l7 && l8 && l9 && l10 && l11 && l12 && l13 && l14 && l15;
+  const isLoaded = loaded;
 
   useEffect(() => {
     localStorage.setItem('ds.theme', theme);
@@ -163,26 +233,32 @@ export function useDashboardState() {
 
   const reset = () => {
     if (!window.confirm("Hard Reset: This will clear ALL dashboard data. Are you sure?")) return;
-    setTagline("Hot honey, reimagined.");
-    setStage("Pre-launch");
-    setMilestones(DEFAULT_MILESTONES.map(m => ({ ...m, status: "Not Started" })));
-    setRetailPrice(0);
-    setFixedCosts(0);
-    setUnitsPerMonth(0);
-    setAbsorbShipping(false);
-    setIngredients(DEFAULT_INGREDIENTS);
-    setPackaging(DEFAULT_PACKAGING);
-    setVariable(DEFAULT_VARIABLE);
-    setFormulation(DEFAULT_FORMULATION);
-    setSocial(DEFAULT_SOCIAL);
-    setDesignFiles(DEFAULT_DESIGN_FILES);
-    setSauces(DEFAULT_SAUCES);
-    setContacts({ vendors: [], packaging: [], distributors: [], retailers: [], important: [] });
+    setter("tagline", "Hot honey, reimagined.");
+    setter("stage", "Pre-launch");
+    setter("milestones", DEFAULT_MILESTONES.map((m: any) => ({ ...m, status: "Not Started" })));
+    setter("retailPrice", 0);
+    setter("fixedCosts", 0);
+    setter("unitsPerMonth", 0);
+    setter("absorbShipping", false);
+    setter("ingredients", DEFAULT_INGREDIENTS);
+    setter("packaging", DEFAULT_PACKAGING);
+    setter("variable", DEFAULT_VARIABLE);
+    setter("formulation", DEFAULT_FORMULATION);
+    setter("social", DEFAULT_SOCIAL);
+    setter("designFiles", DEFAULT_DESIGN_FILES);
+    setter("sauces", DEFAULT_SAUCES);
+    setter("contacts", { vendors: [], packaging: [], distributors: [], retailers: [], important: [] });
   };
 
+  const {
+    tagline, stage, ingredients, packaging, variable,
+    retailPrice, absorbShipping, fixedCosts, unitsPerMonth,
+    milestones, formulation, designFiles, social, sauces, contacts,
+  } = state;
+
   const econ = useMemo(() => {
-    const ing = ingredients.reduce((s: number, r: any) => s + (parseFloat(r.val) || 0), 0);
-    const pkg = packaging.reduce((s: number, r: any) => s + (parseFloat(r.val) || 0), 0);
+    const ing = (ingredients as any[]).reduce((s: number, r: any) => s + (parseFloat(r.val) || 0), 0);
+    const pkg = (packaging as any[]).reduce((s: number, r: any) => s + (parseFloat(r.val) || 0), 0);
     const cogs = ing + pkg + (variable?.labor || 0) + (absorbShipping ? (variable?.shipping || 0) : 0);
     const proc = retailPrice * ((variable?.processingPct || 0) / 100);
     const profit = retailPrice - cogs - proc;

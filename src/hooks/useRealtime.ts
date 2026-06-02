@@ -14,6 +14,8 @@ function startSSE() {
     const key = e.data;
     const set = handlers.get(key);
     if (set) set.forEach(fn => fn(key));
+    const wild = handlers.get('*');
+    if (wild) wild.forEach(fn => fn(key));
   });
 
   es.onerror = () => {
