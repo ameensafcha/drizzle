@@ -1,0 +1,16 @@
+{
+  "name": "Drizzle & Sauce — Founder's Cockpit",
+  "short_name": "Drizzle&Sauce",
+  "description": "Founder dashboard for Drizzle & Sauce hot honey: unit economics, formulation, design, social and sauce R&D.",
+  "start_url": "/mobile",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0E0C09",
+  "theme_color": "#0E0C09",
+  "icons": [
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}
