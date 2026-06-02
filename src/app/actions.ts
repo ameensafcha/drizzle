@@ -28,6 +28,26 @@ export async function getStore(key: string) {
   }
 }
 
+export async function syncBatch(pairs: { key: string; value: any }[]) {
+  try {
+    for (const { key, value } of pairs) {
+      await db.insert(dashboardState)
+        .values({ key, value })
+        .onConflictDoUpdate({
+          target: dashboardState.key,
+          set: { value, updatedAt: new Date() },
+        });
+    }
+    for (const { key } of pairs) {
+      try { await sql`SELECT pg_notify('ds_update', ${key})`; } catch { /* ignore */ }
+    }
+    return { success: true };
+  } catch (error) {
+    console.error('Error syncing batch:', error);
+    return { success: false, error };
+  }
+}
+
 export async function setStore(key: string, value: any) {
   try {
     await db.insert(dashboardState)

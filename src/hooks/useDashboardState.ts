@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect, useReducer, useRef } from 'react';
-import { getAllStore, getStore, setStore } from '@/app/actions';
+import { getAllStore, getStore, syncBatch } from '@/app/actions';
 import { toast } from '@/components/Common';
 import { useRealtime } from './useRealtime';
 
@@ -165,7 +165,10 @@ export function useDashboardState() {
 
   const [state, dispatch] = useReducer(reducer, ALL_DEFAULTS);
   const [loaded, setLoaded] = useState(false);
-  const timers = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
+  const pending = useRef<Set<string>>(new Set());
+  const batchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const prevValues = useRef<Record<string, any>>({});
+  const syncing = useRef(false);
 
   // Single batch fetch — 1 request replaces 15
   useEffect(() => {
@@ -177,28 +180,42 @@ export function useDashboardState() {
     });
   }, []);
 
-  // Per-key debounced sync
+  // Batch sync — queue changes, flush every 5s
+  const flushBatch = async () => {
+    if (pending.current.size === 0) return;
+    syncing.current = true;
+    const keys = [...pending.current];
+    pending.current.clear();
+    batchTimer.current = null;
+
+    const pairs = keys.map(k => ({ key: k, value: prevValues.current[k] }));
+    window.dispatchEvent(new CustomEvent('ds-saving', { detail: true }));
+    const res = await syncBatch(pairs);
+    window.dispatchEvent(new CustomEvent('ds-saving', { detail: false }));
+    syncing.current = false;
+    if (res.success && pairs.length > 0) toast('✦ saved');
+  };
+
   const setter = (key: string, value: any) => {
     dispatch({ type: 'SET', key, value });
-    if (timers.current[key]) clearTimeout(timers.current[key]);
-    timers.current[key] = setTimeout(async () => {
-      window.dispatchEvent(new CustomEvent('ds-saving', { detail: true }));
-      const res = await setStore(key, value);
-      window.dispatchEvent(new CustomEvent('ds-saving', { detail: false }));
-      if (res.success) toast('✦ saved');
-    }, 800);
+    prevValues.current[key] = value;
+    pending.current.add(key);
+    if (!batchTimer.current) {
+      batchTimer.current = setTimeout(flushBatch, 5000);
+    }
   };
 
   // Realtime — single wildcard handles all keys
   useRealtime('*', (updatedKey) => {
+    if (syncing.current) return;
     getStore(updatedKey).then(stored => {
       if (stored !== null) dispatch({ type: 'SET', key: updatedKey, value: stored });
     });
   });
 
-  // Cleanup timers
+  // Flush on unmount
   useEffect(() => {
-    return () => { for (const k in timers.current) clearTimeout(timers.current[k]); };
+    return () => { if (batchTimer.current) clearTimeout(batchTimer.current); flushBatch(); };
   }, []);
 
   // Individual setters (same API as before)

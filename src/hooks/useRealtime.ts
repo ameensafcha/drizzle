@@ -5,10 +5,14 @@ import { useEffect, useRef } from 'react';
 type RealtimeHandler = (key: string) => void;
 
 const handlers = new Map<string, Set<RealtimeHandler>>();
+let es: EventSource | null = null;
 
 function startSSE() {
-  const url = `${window.location.origin}/api/realtime`;
-  const es = new EventSource(url);
+  if (es) es.close();
+  if (typeof window === 'undefined') return;
+  if (document.hidden) return;
+
+  es = new EventSource(`${window.location.origin}/api/realtime`);
 
   es.addEventListener('update', (e: MessageEvent) => {
     const key = e.data;
@@ -19,18 +23,21 @@ function startSSE() {
   });
 
   es.onerror = () => {
-    es.close();
+    if (es) { es.close(); es = null; }
     setTimeout(startSSE, 3000);
   };
 }
 
-let sseStarted = false;
-function ensureSSE() {
-  if (typeof window === 'undefined') return;
-  if (!sseStarted) {
-    sseStarted = true;
-    startSSE();
-  }
+function stopSSE() {
+  if (es) { es.close(); es = null; }
+}
+
+// Visibility change — pause when hidden, resume when visible
+if (typeof window !== 'undefined') {
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden) { stopSSE(); }
+    else { startSSE(); }
+  });
 }
 
 export function useRealtime(key: string, handler: RealtimeHandler) {
@@ -38,7 +45,7 @@ export function useRealtime(key: string, handler: RealtimeHandler) {
   handlerRef.current = handler;
 
   useEffect(() => {
-    ensureSSE();
+    startSSE();
     if (!handlers.has(key)) handlers.set(key, new Set());
 
     const wrapper: RealtimeHandler = (k) => handlerRef.current(k);
