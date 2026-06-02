@@ -178,7 +178,7 @@ input[type="number"]::-webkit-outer-spin-button {
 input[type="number"] { -moz-appearance: textfield; }
 
 .num-input { position: relative; display: inline-flex; align-items: center; width: 100%; }
-.num-input input { text-align: right; padding-right: 38px; }
+.num-input input { text-align: left; }
 .num-input .suffix { position: absolute; right: 10px; font-family: var(--font-mono); font-size: 11px; color: var(--ink-mute); letter-spacing: 0.05em; pointer-events: none; }
 
 /* ============== RANGE SLIDER ============== */
@@ -302,7 +302,7 @@ button { font-family: inherit; cursor: pointer; border: none; background: transp
 .cost-table td.val { width: 26%; min-width: 120px; }
 .cost-table tr.subtotal { border-top: 2px solid var(--line-strong); border-bottom: none; }
 .cost-table tr.subtotal td { padding-top: 14px; font-family: var(--font-display); font-size: 13px; color: var(--honey); }
-.cost-table tr.subtotal td.val { text-align: right; font-size: 16px; }
+.cost-table tr.subtotal td.val { font-size: 16px; }
 
 /* ============== TILES ============== */
 .tile-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 18px; margin-top: 8px; }
