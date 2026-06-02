@@ -1,4 +1,4 @@
-import { useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { usePersistentState } from './usePersistentState';
 
 export const DEFAULT_INGREDIENTS = [
@@ -148,11 +148,15 @@ export function useDashboardState() {
   const [social,         setSocial,         l13] = usePersistentState("social", DEFAULT_SOCIAL);
   const [sauces,         setSauces,         l14] = usePersistentState("sauces", DEFAULT_SAUCES);
   const [contacts,       setContacts,       l15] = usePersistentState("contacts", DEFAULT_CONTACTS);
-  const [theme,          setTheme,          l16] = usePersistentState("theme", "dark");
+  const [theme, setTheme] = useState(() => {
+    if (typeof window === 'undefined') return 'dark';
+    return localStorage.getItem('ds.theme') || 'dark';
+  });
 
-  const isLoaded = l1 && l2 && l3 && l4 && l5 && l6 && l7 && l8 && l9 && l10 && l11 && l12 && l13 && l14 && l15 && l16;
+  const isLoaded = l1 && l2 && l3 && l4 && l5 && l6 && l7 && l8 && l9 && l10 && l11 && l12 && l13 && l14 && l15;
 
   useEffect(() => {
+    localStorage.setItem('ds.theme', theme);
     document.documentElement.setAttribute("data-theme", theme);
     document.body.setAttribute("data-theme", theme);
   }, [theme]);
