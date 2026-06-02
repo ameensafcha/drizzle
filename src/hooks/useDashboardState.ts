@@ -1,7 +1,7 @@
 import { useState, useMemo, useEffect, useReducer, useRef } from 'react';
-import { getAllStore, getStore, syncBatch, patchStore } from '@/app/actions';
+import { getAllStore, setStore, patchStore } from '@/app/actions';
 import { toast } from '@/components/Common';
-import { useRealtime } from './useRealtime';
+import useSWR from 'swr';
 
 type Action = { type: 'INIT'; payload: Record<string, any> } | { type: 'SET'; key: string; value: any };
 
@@ -169,16 +169,32 @@ export function useDashboardState() {
   const batchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const prevValues = useRef<Record<string, any>>({});
   const syncing = useRef(false);
+  const stateRef = useRef(state);
+  stateRef.current = state;
 
-  // Single batch fetch — 1 request replaces 15
+  // SWR polling — Neon HTTP driver, stateless, no connections held
+  const { data: pollData } = useSWR('dashboard', () => getAllStore(), {
+    refreshInterval: 3000,
+    revalidateOnFocus: true,
+    shouldRetryOnError: true,
+  });
+
+  // Apply polled data — only changed keys to avoid focus stealing
   useEffect(() => {
-    getAllStore().then(data => {
-      if (data && Object.keys(data).length > 0) {
-        dispatch({ type: 'INIT', payload: data });
+    if (!pollData || Object.keys(pollData).length === 0) return;
+    if (syncing.current) return; // Skip while we're pushing our own updates
+    const cur = stateRef.current;
+    const changed: Record<string, any> = {};
+    for (const key of Object.keys(pollData)) {
+      if (JSON.stringify(pollData[key]) !== JSON.stringify(cur[key])) {
+        changed[key] = pollData[key];
       }
-      setLoaded(true);
-    });
-  }, []);
+    }
+    if (Object.keys(changed).length > 0) {
+      dispatch({ type: 'INIT', payload: changed });
+    }
+    if (!loaded) setLoaded(true);
+  }, [pollData, loaded]);
 
   // Batch sync — queue changes, flush every 5s
   const flushBatch = async () => {
@@ -188,12 +204,19 @@ export function useDashboardState() {
     pending.current.clear();
     batchTimer.current = null;
 
-    const pairs = keys.map(k => ({ key: k, value: prevValues.current[k] }));
     window.dispatchEvent(new CustomEvent('ds-saving', { detail: true }));
-    const res = await syncBatch(pairs);
+    // For array/object keys, use patchStore (delta update) to prevent overwrites
+    for (const key of keys) {
+      const val = prevValues.current[key];
+      if (Array.isArray(val) || typeof val === 'object') {
+        await patchStore(key, [], val);
+      } else {
+        await setStore(key, val);
+      }
+    }
     window.dispatchEvent(new CustomEvent('ds-saving', { detail: false }));
     syncing.current = false;
-    if (res.success && pairs.length > 0) toast('✦ saved');
+    if (keys.length > 0) toast('✦ saved');
   };
 
   const setter = (key: string, value: any) => {
@@ -204,18 +227,6 @@ export function useDashboardState() {
       batchTimer.current = setTimeout(flushBatch, 5000);
     }
   };
-
-  // Realtime — single wildcard handles all keys (data comes in SSE payload)
-  useRealtime('*', (updatedKey, value) => {
-    if (syncing.current) return;
-    if (value !== undefined) {
-      dispatch({ type: 'SET', key: updatedKey, value });
-    } else {
-      getStore(updatedKey).then(stored => {
-        if (stored !== null) dispatch({ type: 'SET', key: updatedKey, value: stored });
-      });
-    }
-  });
 
   // Flush on unmount
   useEffect(() => {
